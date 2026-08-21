@@ -1,0 +1,754 @@
+/* AJAY DHIMAN — shared site scripts (v7) */
+(function () {
+  "use strict";
+
+  /* Mobile nav toggle */
+  var toggle = document.querySelector(".nav-toggle");
+  var links = document.querySelector(".nav-links");
+  if (toggle && links) {
+    toggle.addEventListener("click", function () {
+      toggle.classList.toggle("open");
+      links.classList.toggle("open");
+    });
+    links.addEventListener("click", function (e) {
+      if (e.target.tagName === "A") {
+        toggle.classList.remove("open");
+        links.classList.remove("open");
+      }
+    });
+  }
+
+  /* Header shadow on scroll */
+  var header = document.querySelector(".site-header");
+  if (header) {
+    var onScroll = function () {
+      if (window.scrollY > 10) {
+        header.style.boxShadow = "0 10px 30px rgba(23,28,38,0.12)";
+      } else {
+        header.style.boxShadow = "none";
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+  }
+
+  /* Reveal-on-scroll */
+  var revealEls = document.querySelectorAll(".reveal");
+  if ("IntersectionObserver" in window && revealEls.length) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) {
+          en.target.classList.add("in");
+          io.unobserve(en.target);
+        }
+      });
+    }, { threshold: 0.12 });
+    revealEls.forEach(function (el) { io.observe(el); });
+  } else {
+    revealEls.forEach(function (el) { el.classList.add("in"); });
+  }
+
+  /* ---------- Lightbox (gallery) ---------- */
+  var lb = document.getElementById("lightbox");
+  if (lb) {
+    var lbImg = lb.querySelector(".lb-img");
+    var lbCap = lb.querySelector(".lb-cap");
+    var items = Array.prototype.slice.call(document.querySelectorAll(".g-item"));
+    var idx = 0;
+    var show = function (i) {
+      if (!items.length) return;
+      idx = (i + items.length) % items.length;
+      var it = items[idx];
+      var img = it.querySelector("img");
+      var cap = it.querySelector(".g-cap");
+      lbImg.src = img.src;
+      lbCap.textContent = cap ? cap.textContent : "";
+      lb.classList.add("open");
+      document.body.style.overflow = "hidden";
+    };
+    items.forEach(function (it, i) {
+      it.addEventListener("click", function () { show(i); });
+    });
+    var close = function () {
+      lb.classList.remove("open");
+      document.body.style.overflow = "";
+    };
+    lb.querySelector(".lb-close").addEventListener("click", close);
+    var prev = lb.querySelector(".lb-prev");
+    var next = lb.querySelector(".lb-next");
+    if (prev) prev.addEventListener("click", function (e) { e.stopPropagation(); show(idx - 1); });
+    if (next) next.addEventListener("click", function (e) { e.stopPropagation(); show(idx + 1); });
+    lb.addEventListener("click", function (e) { if (e.target === lb) close(); });
+    document.addEventListener("keydown", function (e) {
+      if (!lb.classList.contains("open")) return;
+      if (e.key === "Escape") close();
+      if (e.key === "ArrowLeft") show(idx - 1);
+      if (e.key === "ArrowRight") show(idx + 1);
+    });
+  }
+
+  /* Contact form (front-end only) */
+  var form = document.getElementById("contact-form");
+  if (form) {
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var btn = form.querySelector("button[type=submit]");
+      var note = form.querySelector(".form-note");
+      var orig = btn ? btn.textContent : "";
+      if (btn) { btn.disabled = true; btn.textContent = "Sending…"; }
+      var subject = encodeURIComponent("Website enquiry for Ajay Dhiman");
+      var body = encodeURIComponent(
+        "Name: " + (form.name.value || "") +
+        "\nEmail: " + (form.email.value || "") +
+        "\nMessage:\n" + (form.message.value || "")
+      );
+      window.location.href = "mailto:er.ajaydhiman@gmail.com?subject=" + subject + "&body=" + body;
+      setTimeout(function () {
+        if (btn) { btn.disabled = false; btn.textContent = orig; }
+        if (note) { note.style.display = "block"; }
+      }, 1200);
+    });
+  }
+
+  /* Active nav link */
+  var path = window.location.pathname.split("/").pop() || "index.html";
+  var navA = document.querySelectorAll(".nav-links a");
+  navA.forEach(function (a) {
+    var href = a.getAttribute("href");
+    if (href === path) a.classList.add("active");
+  });
+
+  /* ============================================================
+     v9: OWNER MODE — completely hidden admin toggle.
+     Regular visitors see NO add controls, NO dot, NO hint.
+     The owner reveals the "+ Add Photo" / "+ Add Entry" controls
+     with a SECRET keyboard sequence: hold Shift, press O, then E
+     (within 1.5s). Nothing is shown on screen until owner mode is
+     active — then the add cards appear. Persists in localStorage
+     only after the owner activates it.
+     ============================================================ */
+  var OWNER_LS = "ajaydhiman_owner_mode_v10";
+  var ownerOn = false;
+  try { ownerOn = localStorage.getItem(OWNER_LS) === "1"; } catch (e) { /* ignore */ }
+
+  function setOwnerMode(on) {
+    ownerOn = !!on;
+    if (ownerOn) {
+      document.body.classList.add("owner-mode");
+    } else {
+      document.body.classList.remove("owner-mode");
+    }
+    try { localStorage.setItem(OWNER_LS, ownerOn ? "1" : "0"); } catch (e) { /* ignore */ }
+  }
+
+  /* Secret sequence: Shift held + "o" then "e" (1.5s window) — no visible hint */
+  var ownerKeys = "";
+  var ownerShiftHeld = false;
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Shift") { ownerShiftHeld = true; return; }
+    if (!ownerShiftHeld) return;
+    if (e.key && e.key.length === 1 && /[a-z]/i.test(e.key)) {
+      ownerKeys += e.key.toLowerCase();
+      if (ownerKeys.length > 6) ownerKeys = ownerKeys.slice(-6);
+      if (ownerKeys.slice(-2) === "oe") {
+        setOwnerMode(!ownerOn);
+        ownerKeys = "";
+      }
+      clearTimeout(ownerKeys._t);
+      ownerKeys._t = setTimeout(function () { ownerKeys = ""; }, 1500);
+    }
+  });
+  document.addEventListener("keyup", function (e) {
+    if (e.key === "Shift") ownerShiftHeld = false;
+  });
+  window.addEventListener("blur", function () { ownerShiftHeld = false; ownerKeys = ""; });
+
+  /* Apply persisted owner state on load — visitors never see the controls */
+  setOwnerMode(ownerOn);
+
+  /* ============================================================
+     v7/v8: Add Photo (gallery) + Add Entry (experience/journey)
+     Client-side additions persisted in localStorage.
+     v8: add-photo now asks WHERE to show + NAME + HEADING.
+     v9: photos render into the SELECTED location (all 6 work).
+     v10: owner mode shows Add + Delete; delete removes from location.
+     v11: + Edit/Change photo (add/change/delete all available),
+          contextual "where" detail (company/milestone/section),
+          localStorage keys migrated to v11 (v10 data auto-carried).
+     ============================================================ */
+  var LS_PHOTOS = "ajaydhiman_photos_v11";
+  var LS_EXP = "ajaydhiman_exp_v11";
+  var LS_JOURNEY = "ajaydhiman_journey_v11";
+  var LS_V10 = {
+    photos: "ajaydhiman_photos_v10",
+    exp: "ajaydhiman_exp_v10",
+    journey: "ajaydhiman_journey_v10"
+  };
+
+  function readLS(key) {
+    try {
+      var raw = localStorage.getItem(key);
+      if (raw) return JSON.parse(raw);
+      /* migration: v10 → v11 keys (copy once, never overwrite newer data) */
+      var legacy = null;
+      if (key === LS_PHOTOS) legacy = localStorage.getItem(LS_V10.photos);
+      else if (key === LS_EXP) legacy = localStorage.getItem(LS_V10.exp);
+      else if (key === LS_JOURNEY) legacy = localStorage.getItem(LS_V10.journey);
+      if (legacy) {
+        var arr = JSON.parse(legacy);
+        try { localStorage.setItem(key, JSON.stringify(arr)); } catch (e) { /* ignore */ }
+        return arr;
+      }
+      return [];
+    } catch (e) { return []; }
+  }
+  function writeLS(key, arr) {
+    try { localStorage.setItem(key, JSON.stringify(arr)); } catch (e) { /* ignore */ }
+  }
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  /* ---------- Modal helpers ---------- */
+  function openModal(id) {
+    var m = document.getElementById(id);
+    if (m) m.classList.add("open");
+  }
+  function closeModal(id) {
+    var m = document.getElementById(id);
+    if (m) m.classList.remove("open");
+  }
+  function wireClose(id) {
+    var m = document.getElementById(id);
+    if (!m) return;
+    var x = m.querySelector(".modal-close-x");
+    var cancel = m.querySelector("[data-cancel]");
+    if (x) x.addEventListener("click", function () { closeModal(id); });
+    if (cancel) cancel.addEventListener("click", function () { closeModal(id); });
+    m.addEventListener("click", function (e) { if (e.target === m) closeModal(id); });
+  }
+
+  /* ---------- GALLERY: add photo (v9: renders into the SELECTED location) ---------- */
+  function buildUserPhoto(p) {
+    var div = document.createElement("div");
+    div.className = "up-photo";
+    div.setAttribute("data-user-photo", p.id);
+    var img = document.createElement("img");
+    img.src = p.src;
+    img.alt = p.name || p.cap || "User-added photo";
+    img.loading = "lazy";
+    div.appendChild(img);
+    var nm = document.createElement("div");
+    nm.className = "up-name";
+    nm.textContent = p.name || p.heading || p.cap || "User-added photo";
+    div.appendChild(nm);
+    if (p.heading) {
+      var hd = document.createElement("div");
+      hd.className = "up-head";
+      hd.textContent = p.heading;
+      div.appendChild(hd);
+    }
+    if (p.detail) {
+      var dt = document.createElement("div");
+      dt.className = "up-detail";
+      dt.textContent = p.detail;
+      div.appendChild(dt);
+    }
+    /* Owner-only delete button on each user-added photo chip */
+    var del = document.createElement("button");
+    del.type = "button";
+    del.className = "up-del";
+    del.setAttribute("aria-label", "Delete this photo");
+    del.innerHTML = "&#10005;";
+    del.addEventListener("click", function (e) {
+      e.stopPropagation();
+      deletePhoto(p.id);
+    });
+    div.appendChild(del);
+    /* Owner-only edit/change button on each user-added photo chip */
+    var edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "up-edit";
+    edit.setAttribute("aria-label", "Edit this photo");
+    edit.innerHTML = "&#9998;";
+    edit.addEventListener("click", function (e) {
+      e.stopPropagation();
+      openPhotoEditor(p.id);
+    });
+    div.appendChild(edit);
+    return div;
+  }
+
+  /* ---------- EDIT/CHANGE photo (v11): owner can change name/heading/caption/where/detail ---------- */
+  function openPhotoEditor(id) {
+    var list = readLS(LS_PHOTOS);
+    var p = null;
+    for (var i = 0; i < list.length; i++) { if (list[i] && list[i].id === id) { p = list[i]; break; } }
+    if (!p) return;
+    currentEditId = id;
+    var m = document.getElementById("modal-edit-photo");
+    if (!m) { /* modal not on this page — build one dynamically */ }
+    if (m) {
+      var fName = document.getElementById("edit-photo-name");
+      var fHead = document.getElementById("edit-photo-heading");
+      var fCap = document.getElementById("edit-photo-caption");
+      var fWhere = document.getElementById("edit-photo-where");
+      var fDetail = document.getElementById("edit-photo-detail");
+      if (fName) fName.value = p.name || "";
+      if (fHead) fHead.value = p.heading || "";
+      if (fCap) fCap.value = p.cap || "";
+      if (fWhere) {
+        fWhere.value = p.where || "gallery";
+        updatePhotoDetailField(fWhere.value, fDetail, p.detail);
+      }
+      if (fDetail && fDetail.dataset.last) fDetail.value = p.detail || "";
+      openModal("modal-edit-photo");
+    }
+  }
+
+  function updatePhotoDetailField(where, detailEl, currentValue) {
+    if (!detailEl) return;
+    detailEl.style.display = "block";
+    var label = detailEl.previousElementSibling;
+    var input = detailEl.tagName === "INPUT" ? detailEl : detailEl.querySelector("input");
+    if (where === "experience") {
+      if (label) label.textContent = "Which company / role does it belong to? (optional)";
+      if (input) { input.placeholder = "e.g. Revolt Motors — Director"; }
+    } else if (where === "journey") {
+      if (label) label.textContent = "Which milestone / year does it belong to? (optional)";
+      if (input) { input.placeholder = "e.g. 2021 — Revolt turnaround"; }
+    } else if (where === "about") {
+      if (label) label.textContent = "Which About section does it belong to? (optional)";
+      if (input) { input.placeholder = "e.g. Leadership Philosophy"; }
+    } else if (where === "hero") {
+      if (label) label.textContent = "Which hero area? (optional)";
+      if (input) { input.placeholder = "e.g. Portrait / side stack"; }
+    } else if (where === "contact") {
+      if (label) label.textContent = "Which contact area? (optional)";
+      if (input) { input.placeholder = "e.g. Alongside the details card"; }
+    } else {
+      if (label) label.textContent = "Any extra detail? (optional)";
+      if (input) { input.placeholder = "e.g. Year, event, context"; }
+    }
+    if (input) input.value = currentValue || "";
+  }
+
+  /* Delete a user-added photo from storage and re-render */
+  function deletePhoto(id) {
+    if (!id) return;
+    var list = readLS(LS_PHOTOS).filter(function (p) {
+      return !p || p.id !== id;
+    });
+    writeLS(LS_PHOTOS, list);
+    renderPhotos();
+  }
+
+  function pageId() {
+    var b = document.body;
+    return b && b.getAttribute("data-page") ? b.getAttribute("data-page") : "";
+  }
+
+  function photoContainerFor(where) {
+    var pg = pageId();
+    if (where === "gallery") return document.querySelector(".gallery");
+    /* Offline edition: all sections on one page — target the section by id */
+    if (pg === "offline") {
+      if (where === "hero") return document.querySelector("#home .hero-portrait");
+      if (where === "about") return document.querySelector("#about .split");
+      if (where === "journey") return document.querySelector("#journey");
+      if (where === "experience") return document.querySelector("#experience");
+      if (where === "contact") return document.querySelector("#contact .contact-grid");
+      return document.querySelector("#gallery .gallery");
+    }
+    /* Multi-page edition: a photo only renders on ITS own page */
+    if (where === "hero" && pg === "home") return document.querySelector(".hero-portrait");
+    if (where === "about" && pg === "about") return document.querySelector(".split");
+    if (where === "journey" && pg === "journey") return document.querySelector(".page-hero");
+    if (where === "experience" && pg === "experience") return document.querySelector(".page-hero");
+    if (where === "contact" && pg === "contact") return document.querySelector(".contact-grid");
+    return null;
+  }
+
+  /* Ensure a page has its dedicated user-photo stack container */
+  function ensurePhotoStack(where) {
+    var host = photoContainerFor(where);
+    if (!host) return null;
+    var stack = host.querySelector(":scope > .user-photo-stack");
+    if (!stack) {
+      stack = document.createElement("div");
+      stack.className = "user-photo-stack";
+      /* For full-section hosts (offline edition: #journey / #experience),
+         place the stack at the top of the section's container instead */
+      if (host.tagName === "SECTION") {
+        var cont = host.querySelector(":scope > .container");
+        if (cont) { cont.insertBefore(stack, cont.firstChild); return stack; }
+      }
+      host.insertBefore(stack, host.firstChild);
+    }
+    return stack;
+  }
+
+  function renderPhotos() {
+    var list = readLS(LS_PHOTOS);
+    list.forEach(function (p) {
+      if (!p || !p.src) return;
+      var where = (p.where === "hero" || p.where === "about" || p.where === "journey" ||
+                   p.where === "experience" || p.where === "contact") ? p.where : "gallery";
+      var gallery = document.querySelector(".gallery");
+      if (where === "gallery" && gallery) {
+        if (gallery.querySelector('[data-user-photo="' + p.id + '"]')) return;
+        var div = document.createElement("div");
+        div.className = "g-item";
+        div.setAttribute("data-user-photo", p.id);
+        var img = document.createElement("img");
+        img.src = p.src;
+        img.alt = p.name || p.cap || "User-added photo";
+        var capDiv = document.createElement("div");
+        capDiv.className = "cap g-cap";
+        capDiv.textContent = (p.heading || p.name || p.cap || "User-added photo");
+        div.appendChild(img);
+        div.appendChild(capDiv);
+        if (p.detail) {
+          var detDiv = document.createElement("div");
+          detDiv.className = "g-detail";
+          detDiv.textContent = p.detail;
+          div.appendChild(detDiv);
+        }
+        /* Owner-only delete button on gallery items the owner added */
+        var gdel = document.createElement("button");
+        gdel.type = "button";
+        gdel.className = "g-del";
+        gdel.setAttribute("aria-label", "Delete this photo");
+        gdel.innerHTML = "&#10005;";
+        gdel.addEventListener("click", function (e) {
+          e.stopPropagation();
+          deletePhoto(p.id);
+        });
+        div.appendChild(gdel);
+        /* Owner-only edit/change button on gallery items */
+        var gedit = document.createElement("button");
+        gedit.type = "button";
+        gedit.className = "g-edit";
+        gedit.setAttribute("aria-label", "Edit this photo");
+        gedit.innerHTML = "&#9998;";
+        gedit.addEventListener("click", function (e) {
+          e.stopPropagation();
+          openPhotoEditor(p.id);
+        });
+        div.appendChild(gedit);
+        gallery.insertBefore(div, gallery.querySelector(".add-photo-card"));
+      } else {
+        var stack = ensurePhotoStack(where);
+        if (!stack) return;
+        if (stack.querySelector('[data-user-photo="' + p.id + '"]')) return;
+        stack.appendChild(buildUserPhoto(p));
+      }
+    });
+    /* refresh lightbox items */
+    if (lb) {
+      items = Array.prototype.slice.call(document.querySelectorAll(".g-item"));
+    }
+  }
+
+  var addPhotoBtn = document.querySelector(".add-photo-card");
+  if (addPhotoBtn) {
+    wireClose("modal-add-photo");
+    addPhotoBtn.addEventListener("click", function () { openModal("modal-add-photo"); });
+    var photoInput = document.getElementById("photo-file");
+    var photoCap = document.getElementById("photo-caption");
+    var photoName = document.getElementById("photo-name");
+    var photoHeading = document.getElementById("photo-heading");
+    var photoWhere = document.getElementById("photo-where");
+    var photoDetail = document.getElementById("photo-detail");
+    var photoSave = document.getElementById("photo-save");
+    var photoImgPreview = document.getElementById("photo-preview");
+    if (photoInput && photoSave) {
+      /* contextual "where" — the detail field label/placeholder adapts */
+      if (photoWhere && photoDetail) {
+        updatePhotoDetailField(photoWhere.value, photoDetail, "");
+        photoWhere.addEventListener("change", function () {
+          updatePhotoDetailField(photoWhere.value, photoDetail, "");
+        });
+      }
+      photoInput.addEventListener("change", function () {
+        var f = photoInput.files && photoInput.files[0];
+        if (!f) return;
+        var reader = new FileReader();
+        reader.onload = function (ev) {
+          photoImgPreview.src = ev.target.result;
+          photoImgPreview.style.display = "block";
+          var wrap = document.getElementById("photo-preview-wrap");
+          if (wrap) wrap.style.display = "block";
+        };
+        reader.readAsDataURL(f);
+      });
+      photoSave.addEventListener("click", function () {
+        var src = photoImgPreview.src || "";
+        if (!src || src.indexOf("data:image") !== 0) { alert("Please choose an image file first."); return; }
+        var where = photoWhere ? photoWhere.value : "gallery";
+        var list = readLS(LS_PHOTOS);
+        list.push({
+          id: "u" + Date.now(),
+          src: src,
+          where: where,
+          name: (photoName ? photoName.value : "") || "",
+          heading: (photoHeading ? photoHeading.value : "") || "",
+          cap: (photoCap ? photoCap.value : "") || (photoName ? photoName.value : "") || "User-added photo",
+          detail: (photoDetail ? photoDetail.value : "") || ""
+        });
+        writeLS(LS_PHOTOS, list);
+        renderPhotos();
+        closeModal("modal-add-photo");
+        ["photo-caption", "photo-name", "photo-heading"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.value = "";
+        });
+        if (photoWhere) photoWhere.value = "gallery";
+        if (photoDetail) { photoDetail.value = ""; updatePhotoDetailField("gallery", photoDetail, ""); }
+        photoImgPreview.src = "";
+        photoImgPreview.style.display = "none";
+        var pwrap = document.getElementById("photo-preview-wrap");
+        if (pwrap) pwrap.style.display = "none";
+        if (photoInput) photoInput.value = "";
+        var msg = "Photo added to: " + (where || "gallery");
+        if (photoName && photoName.value) msg += " — Name: " + photoName.value;
+        if (photoHeading && photoHeading.value) msg += " — Heading: " + photoHeading.value;
+        if (photoDetail && photoDetail.value) msg += " — Detail: " + photoDetail.value;
+        alert(msg);
+      });
+    }
+  }
+
+  /* ---------- GALLERY: delete photo (owner only) ---------- */
+  var deletePhotoCard = document.querySelector(".delete-photo-card");
+  if (deletePhotoCard) {
+    deletePhotoCard.addEventListener("click", function () {
+      var list = readLS(LS_PHOTOS);
+      if (!list.length) { alert("No user-added photos to delete."); return; }
+      var names = list.map(function (p, i) {
+        return (i + 1) + ". " + (p.name || p.heading || p.cap || ("Photo in " + (p.where || "gallery"))) + "  [" + (p.where || "gallery") + "]";
+      }).join("\n");
+      var choice = prompt("Which photo do you want to delete?\n\n" + names + "\n\nEnter the number (1-" + list.length + "):");
+      var n = parseInt(choice, 10);
+      if (isNaN(n) || n < 1 || n > list.length) { return; }
+      var target = list[n - 1];
+      if (target && !confirm('Delete "' + (target.name || target.heading || target.cap || "this photo") + '"? This removes it from "' + (target.where || "gallery") + '".')) return;
+      deletePhoto(target.id);
+    });
+  }
+
+  /* ---------- GALLERY: EDIT/CHANGE photo (owner only, v11) ---------- */
+  var currentEditId = null;
+  var editSaveBtn = document.getElementById("edit-photo-save");
+  if (editSaveBtn) {
+    wireClose("modal-edit-photo");
+    var editWhere = document.getElementById("edit-photo-where");
+    var editDetail = document.getElementById("edit-photo-detail");
+    if (editWhere && editDetail) {
+      editWhere.addEventListener("change", function () {
+        updatePhotoDetailField(editWhere.value, editDetail, editDetail.value);
+      });
+    }
+    editSaveBtn.addEventListener("click", function () {
+      if (!currentEditId) return;
+      var list = readLS(LS_PHOTOS);
+      for (var i = 0; i < list.length; i++) {
+        if (list[i] && list[i].id === currentEditId) {
+          list[i].name = (document.getElementById("edit-photo-name") || {}).value || "";
+          list[i].heading = (document.getElementById("edit-photo-heading") || {}).value || "";
+          list[i].cap = (document.getElementById("edit-photo-caption") || {}).value || "";
+          list[i].where = editWhere ? editWhere.value : "gallery";
+          list[i].detail = editDetail ? editDetail.value : "";
+          break;
+        }
+      }
+      writeLS(LS_PHOTOS, list);
+      renderPhotos();
+      closeModal("modal-edit-photo");
+      currentEditId = null;
+      alert("Photo updated.");
+    });
+  }
+  renderPhotos();
+
+  /* ---------- EXPERIENCE: add entry ---------- */
+  function renderExpEntries() {
+    var listEl = document.querySelector(".exp-list");
+    if (!listEl) return;
+    var list = readLS(LS_EXP);
+    list.forEach(function (e) {
+      if (!e || !e.company) return;
+      if (listEl.querySelector('[data-user-exp="' + e.id + '"]')) return;
+      var article = document.createElement("article");
+      article.className = "card exp-card reveal";
+      article.setAttribute("data-user-exp", e.id);
+      var head = document.createElement("div");
+      head.className = "exp-head";
+      var headL = document.createElement("div");
+      var h3 = document.createElement("h3");
+      h3.innerHTML = esc(e.company);
+      var role = document.createElement("p");
+      role.className = "role";
+      role.innerHTML = esc(e.role || "Role / Title");
+      headL.appendChild(h3);
+      headL.appendChild(role);
+      var years = document.createElement("span");
+      years.className = "exp-years";
+      years.innerHTML = esc(e.years || "");
+      head.appendChild(headL);
+      head.appendChild(years);
+      article.appendChild(head);
+      if (e.location) {
+        var loc = document.createElement("p");
+        loc.className = "exp-loc";
+        loc.innerHTML = esc(e.location);
+        article.appendChild(loc);
+      }
+      if (e.desc) {
+        var d = document.createElement("p");
+        d.className = "exp-desc";
+        d.innerHTML = esc(e.desc);
+        article.appendChild(d);
+      }
+      if (e.tags) {
+        var tags = e.tags.split(",").map(function (t) { return t.trim(); }).filter(Boolean);
+        if (tags.length) {
+          var tw = document.createElement("div");
+          tw.className = "exp-tags";
+          tags.forEach(function (t) {
+            var s = document.createElement("span");
+            s.innerHTML = esc(t);
+            tw.appendChild(s);
+          });
+          article.appendChild(tw);
+        }
+      }
+      if (e.achievements) {
+        var ul = document.createElement("ul");
+        ul.className = "exp-ach";
+        e.achievements.split("\n").map(function (a) { return a.trim(); }).filter(Boolean).forEach(function (a) {
+          var li = document.createElement("li");
+          li.innerHTML = esc(a);
+          ul.appendChild(li);
+        });
+        article.appendChild(ul);
+      }
+      listEl.insertBefore(article, listEl.querySelector(".add-entry-card"));
+    });
+  }
+
+  var addExpBtn = document.querySelector(".add-entry-card[data-target='exp']");
+  if (addExpBtn) {
+    wireClose("modal-add-exp");
+    addExpBtn.addEventListener("click", function () { openModal("modal-add-exp"); });
+    var expSave = document.getElementById("exp-save");
+    if (expSave) {
+      expSave.addEventListener("click", function () {
+        var company = document.getElementById("exp-company");
+        if (!company || !company.value.trim()) { alert("Please enter the company / organization name."); return; }
+        var list = readLS(LS_EXP);
+        list.unshift({
+          id: "e" + Date.now(),
+          company: company.value.trim(),
+          role: (document.getElementById("exp-role") || {}).value || "",
+          years: (document.getElementById("exp-years") || {}).value || "",
+          location: (document.getElementById("exp-loc") || {}).value || "",
+          desc: (document.getElementById("exp-desc") || {}).value || "",
+          tags: (document.getElementById("exp-tags") || {}).value || "",
+          achievements: (document.getElementById("exp-ach") || {}).value || ""
+        });
+        writeLS(LS_EXP, list);
+        renderExpEntries();
+        closeModal("modal-add-exp");
+        ["exp-company", "exp-role", "exp-years", "exp-loc", "exp-desc", "exp-tags", "exp-ach"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.value = "";
+        });
+      });
+    }
+  }
+  renderExpEntries();
+
+  /* ---------- JOURNEY: add entry (timeline) ---------- */
+  function renderJourneyEntries() {
+    var listEl = document.querySelector(".journey-list");
+    if (!listEl) return;
+    var list = readLS(LS_JOURNEY);
+    list.forEach(function (e) {
+      if (!e || !e.company) return;
+      if (listEl.querySelector('[data-user-journey="' + e.id + '"]')) return;
+      var div = document.createElement("div");
+      div.className = "tl-item reveal";
+      div.setAttribute("data-user-journey", e.id);
+      var dot = document.createElement("div");
+      dot.className = "tl-dot";
+      var head = document.createElement("div");
+      head.className = "tl-head";
+      var y = document.createElement("span");
+      y.className = "tl-years";
+      y.innerHTML = esc(e.years || "");
+      var c = document.createElement("span");
+      c.className = "tl-company";
+      c.innerHTML = esc(e.company);
+      head.appendChild(y);
+      head.appendChild(c);
+      var role = document.createElement("div");
+      role.className = "tl-role";
+      role.innerHTML = esc(e.role || "");
+      var body = document.createElement("div");
+      body.className = "tl-body";
+      if (e.desc) {
+        var p = document.createElement("p");
+        p.innerHTML = esc(e.desc);
+        body.appendChild(p);
+      }
+      if (e.achievements) {
+        var ul = document.createElement("ul");
+        e.achievements.split("\n").map(function (a) { return a.trim(); }).filter(Boolean).forEach(function (a) {
+          var li = document.createElement("li");
+          li.innerHTML = esc(a);
+          ul.appendChild(li);
+        });
+        body.appendChild(ul);
+      }
+      div.appendChild(dot);
+      div.appendChild(head);
+      div.appendChild(role);
+      div.appendChild(body);
+      listEl.insertBefore(div, listEl.querySelector(".add-entry-card"));
+    });
+  }
+
+  var addJourneyBtn = document.querySelector(".add-entry-card[data-target='journey']");
+  if (addJourneyBtn) {
+    wireClose("modal-add-journey");
+    addJourneyBtn.addEventListener("click", function () { openModal("modal-add-journey"); });
+    var jSave = document.getElementById("journey-save");
+    if (jSave) {
+      jSave.addEventListener("click", function () {
+        var company = document.getElementById("journey-company");
+        if (!company || !company.value.trim()) { alert("Please enter the company / organization name."); return; }
+        var list = readLS(LS_JOURNEY);
+        list.unshift({
+          id: "j" + Date.now(),
+          company: company.value.trim(),
+          role: (document.getElementById("journey-role") || {}).value || "",
+          years: (document.getElementById("journey-years") || {}).value || "",
+          desc: (document.getElementById("journey-desc") || {}).value || "",
+          achievements: (document.getElementById("journey-ach") || {}).value || ""
+        });
+        writeLS(LS_JOURNEY, list);
+        renderJourneyEntries();
+        closeModal("modal-add-journey");
+        ["journey-company", "journey-role", "journey-years", "journey-desc", "journey-ach"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.value = "";
+        });
+      });
+    }
+  }
+  renderJourneyEntries();
+})();
